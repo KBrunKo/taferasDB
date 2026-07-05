@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lista de Tarefas Nuvem</title>
+  <style>
+    :root {
+      --bg: #FBFAF8; --surface: #FFFFFF; --ink: #17150F;
+      --muted: #6E6B62; --brand: #1E7A55; --line: #E7E3DA;
+    }
+    body { font-family: system-ui, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; background: var(--bg); color: var(--ink); }
+    .card { background: var(--surface); border: 1px solid var(--line); padding: 24px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
+    .input-group { display: flex; gap: 8px; margin-bottom: 20px; }
+    input[type="text"] { flex: 1; padding: 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 16px; }
+    button { background: var(--brand); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    button:hover { background: #15543B; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--line); }
+    .todo-item { display: flex; align-items: center; gap: 12px; font-size: 16px; }
+    .completed { text-decoration: line-through; color: var(--muted); }
+    .delete-btn { background: #DC3545; padding: 6px 12px; font-size: 14px; }
+    .delete-btn:hover { background: #A71D2A; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>📝 Lista de Tarefas (Cloudflare D1)</h2>
+    <p>Os dados abaixo são salvos de forma relacional usando SQL puro na nuvem.</p>
+
+    <div class="input-group">
+      <input type="text" id="todoTitle" placeholder="O que precisa ser feito?">
+      <button onclick="addTodo()">Adicionar</button>
+    </div>
+
+    <ul id="todoList"></ul>
+  </div>
+
+  <script>
+    // COLHA AQUI A URL DO SEU WORKER (Sem a barra no final)
+    const API_URL = 'https://encworker.bru-bcms.workers.dev'; 
+
+    async function loadTodos() {
+      const ul = document.getElementById('todoList');
+      ul.innerHTML = '<li>Carregando tarefas...</li>';
+      
+      try {
+        const res = await fetch(`${API_URL}/todos`);
+        const todos = await res.json();
+        ul.innerHTML = '';
+
+        todos.forEach(todo => {
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <div class="todo-item">
+              <input type="checkbox" ${todo.completed ? 'checked' : ''} onchange="toggleTodo(${todo.id}, ${todo.completed})">
+              <span class="${todo.completed ? 'completed' : ''}">${todo.title}</span>
+            </div>
+            <button class="delete-btn" onclick="deleteTodo(${todo.id})">Apagar</button>
+          `;
+          ul.appendChild(li);
+        });
+      } catch (err) {
+        ul.innerHTML = '<li>Erro ao carregar dados.</li>';
+      }
+    }
+
+    async function addTodo() {
+      const titleInput = document.getElementById('todoTitle');
+      if (!titleInput.value.trim()) return;
+
+      await fetch(`${API_URL}/todos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: titleInput.value.trim() })
+      });
+
+      titleInput.value = '';
+      loadTodos();
+    }
+
+    async function toggleTodo(id, currentStatus) {
+      await fetch(`${API_URL}/todos/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed: !currentStatus })
+      });
+      loadTodos();
+    }
+
+    async function deleteTodo(id) {
+      await fetch(`${API_URL}/todos/${id}`, { method: 'DELETE' });
+      loadTodos();
+    }
+
+    // Carrega a lista assim que abrir a página
+    loadTodos();
+  </script>
+</body>
+</html>
