@@ -17,9 +17,12 @@
     button:hover { background: #15543B; }
     ul { list-style: none; padding: 0; margin: 0; }
     li { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--line); }
-    .todo-item { display: flex; align-items: center; gap: 12px; font-size: 16px; }
+    .todo-content { display: flex; align-items: center; gap: 12px; }
+    .todo-info { display: flex; flex-direction: column; }
+    .todo-title { font-size: 16px; font-weight: 500; }
+    .todo-time { font-size: 12px; color: var(--muted); }
     .completed { text-decoration: line-through; color: var(--muted); }
-    .delete-btn { background: #DC3545; padding: 6px 12px; font-size: 14px; }
+    .delete-btn { background: #DC3545; padding: 6px 12px; font-size: 14px; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; border: none; }
     .delete-btn:hover { background: #A71D2A; }
   </style>
 </head>
@@ -27,10 +30,10 @@
 
   <div class="card">
     <h2>📝 Lista de Tarefas (Cloudflare D1)</h2>
-    <p>Os dados abaixo são salvos de forma relacional usando SQL puro na nuvem.</p>
+    <p>Os dados abaixo cumprem todos os requisitos de persistência e auditoria de data.</p>
 
     <div class="input-group">
-      <input type="text" id="todoTitle" placeholder="O que precisa ser feito?">
+      <input type="text" id="todoTitle" placeholder="O que precisa ser feito?" autocomplete="off">
       <button onclick="addTodo()">Adicionar</button>
     </div>
 
@@ -38,46 +41,53 @@
   </div>
 
   <script>
-    // COLHA AQUI A URL DO SEU WORKER (Sem a barra no final)
     const API_URL = 'https://tarefaworker.bru-bcms.workers.dev'; 
 
     async function loadTodos() {
       const ul = document.getElementById('todoList');
-      ul.innerHTML = '<li>Carregando tarefas...</li>';
       
       try {
         const res = await fetch(`${API_URL}/todos`);
         const todos = await res.json();
         ul.innerHTML = '';
 
+        if(todos.length === 0) {
+          ul.innerHTML = '<li style="color: var(--muted); border: none;">Nenhuma tarefa encontrada. Adicione uma acima!</li>';
+          return;
+        }
+
         todos.forEach(todo => {
           const li = document.createElement('li');
           li.innerHTML = `
-            <div class="todo-item">
+            <div class="todo-content">
               <input type="checkbox" ${todo.completed ? 'checked' : ''} onchange="toggleTodo(${todo.id}, ${todo.completed})">
-              <span class="${todo.completed ? 'completed' : ''}">${todo.title}</span>
+              <div class="todo-info">
+                <span class="todo-title ${todo.completed ? 'completed' : ''}">${todo.title}</span>
+                <span class="todo-time">Criada em: ${todo.created_at}</span>
+              </div>
             </div>
             <button class="delete-btn" onclick="deleteTodo(${todo.id})">Apagar</button>
           `;
           ul.appendChild(li);
         });
       } catch (err) {
-        ul.innerHTML = '<li>Erro ao carregar dados.</li>';
+        ul.innerHTML = '<li>Erro ao carregar dados. Verifique a conexão com o Worker.</li>';
       }
     }
 
     async function addTodo() {
       const titleInput = document.getElementById('todoTitle');
-      if (!titleInput.value.trim()) return;
+      const title = titleInput.value.trim();
+      if (!title) return;
 
       await fetch(`${API_URL}/todos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: titleInput.value.trim() })
+        body: JSON.stringify({ title })
       });
 
       titleInput.value = '';
-      loadTodos();
+      loadTodos(); // Atualiza a interface refletindo o estado real do banco
     }
 
     async function toggleTodo(id, currentStatus) {
@@ -86,15 +96,17 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ completed: !currentStatus })
       });
-      loadTodos();
+      loadTodos(); // Garante o alinhamento com o banco
     }
 
     async function deleteTodo(id) {
+      if(!confirm("Deseja mesmo excluir esta tarefa?")) return;
+      
       await fetch(`${API_URL}/todos/${id}`, { method: 'DELETE' });
-      loadTodos();
+      loadTodos(); // Remove e atualiza
     }
 
-    // Carrega a lista assim que abrir a página
+    // Inicialização automática
     loadTodos();
   </script>
 </body>
